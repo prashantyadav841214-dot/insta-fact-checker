@@ -16,12 +16,12 @@ Aap user se saral Hindi/Hinglish me aadar ke sath baat karte hain.
 Planning, general Q&A, coding, aur Instagram video/audio/reel analysis sabhi me vistrit help karte hain.
 """
 
-# Dono models initialize karein
-pro_model = genai.GenerativeModel("gemini-2.5-pro", system_instruction=system_instruction)
-flash_model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system_instruction)
+# Latest Gemini 3 series models
+pro_model = genai.GenerativeModel("gemini-3.1-pro-preview", system_instruction=system_instruction)
+flash_model = genai.GenerativeModel("gemini-3-flash-preview", system_instruction=system_instruction)
 
 user_chats = {}
-user_modes = {}  # Har user ka active model ('pro' ya 'flash')
+user_modes = {}
 
 def get_chat_session(user_id):
     mode = user_modes.get(user_id, "pro")
@@ -37,8 +37,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     welcome_text = (
         "Namaste! Main aapka personal Gemini AI Assistant hoon.\n\n"
-        "✨ **Active Model:** Gemini 2.5 Pro (Advanced)\n"
-        "💡 *Note:* Agar Pro model ki daily limit poori ho jayegi, toh main aapko bata kar automatically Flash model par shift ho jaunga.\n\n"
+        "✨ **Active Model:** Gemini 3.1 Pro (Latest Advanced)\n"
+        "💡 *Note:* Agar Pro model ki daily limit poori ho jayegi, toh main aapko bata kar automatically Gemini 3 Flash par shift ho jaunga.\n\n"
         "• Nayi planning ya chat ke liye: /clear\n"
         "• Model check ya badalne ke liye: /mode"
     )
@@ -51,7 +51,6 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_chats[user_id] = active_model.start_chat(history=[])
     await update.message.reply_text(f"Chat memory reset ho gayi hai! (Current Mode: {mode.upper()})")
 
-# Model check ya change karne ka command
 async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     current_mode = user_modes.get(user_id, "pro")
@@ -62,18 +61,17 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_modes[user_id] = choice
             active_model = pro_model if choice == "pro" else flash_model
             user_chats[user_id] = active_model.start_chat(history=[])
-            await update.message.reply_text(f"Model successfully badal kar **Gemini {choice.upper()}** kar diya gaya hai!", parse_mode="Markdown")
+            await update.message.reply_text(f"Model successfully badal kar **Gemini 3 {choice.upper()}** kar diya gaya hai!", parse_mode="Markdown")
             return
 
     await update.message.reply_text(
-        f"Abhi active model: **Gemini {current_mode.upper()}** hai.\n\n"
+        f"Abhi active model: **Gemini 3 {current_mode.upper()}** hai.\n\n"
         "Badalne ke liye likhein:\n"
-        "• `/mode pro` - Advanced Pro model ke liye\n"
-        "• `/mode flash` - Unlimited Fast model ke liye",
+        "• `/mode pro` - Advanced Pro model\n"
+        "• `/mode flash` - Fast Flash model",
         parse_mode="Markdown"
     )
 
-# Text Messages + Auto Fallback Logic
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_text = update.message.text
@@ -88,17 +86,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         err_str = str(e)
-        # Agar Pro model ki limit (429 Quota Exhausted) aa jaye
         if "429" in err_str or "quota" in err_str.lower() or "resourceexhausted" in err_str.lower():
             user_modes[user_id] = "flash"
-            # Flash chat session shuru karein
             flash_chat = flash_model.start_chat(history=[])
             user_chats[user_id] = flash_chat
             
             warning = (
-                "⚠️ **Gemini Pro (Advanced) ki daily limit poori ho gayi hai!**\n"
-                "Chat bina ruke chalti rahe, isliye maine automatically **Gemini Flash** par shift kar diya hai.\n\n"
-                "Aapke sawal ka jawab Flash se taiyar hai:\n\n"
+                "⚠️ **Gemini 3.1 Pro ki daily limit poori ho gayi hai!**\n"
+                "Main automatically **Gemini 3 Flash** par shift ho gaya hoon.\n\n"
             )
             try:
                 flash_res = await asyncio.to_thread(flash_chat.send_message, user_text)
@@ -110,7 +105,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await status_msg.edit_text(f"Error: {err_str}")
 
-# Video Analysis + Fallback
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     mode = user_modes.get(user_id, "pro")
